@@ -79,7 +79,7 @@ gama_gpu(Modelo, baja) :-
 
 
 % =========================================================================
-% 3. LÓGICA DE CÁLCULO Y RECOMENDACIÓN
+% 3. LÓGICA DE CÁLCULO Y RECOMENDACIÓN GENERAL
 % =========================================================================
 
 % Regla para ajustar el impacto del CPU según la resolución
@@ -109,7 +109,7 @@ calcular_bottleneck(CPU, GPU, Resolucion, Porcentaje, Mensaje) :-
         Mensaje = 'Configuracion equilibrada ideal'
     ).
 
-% SUGERENCIA DE COMPONENTE
+% SUGERENCIA DE COMPONENTE ESTÁNDAR
 recomendar_gpu_para_cpu(CPU, GPU_Sugerida) :-
     gama_cpu(CPU, Gama),
     gama_gpu(GPU_Sugerida, Gama).
@@ -120,3 +120,28 @@ juegos_sugeridos_por_gpu(GPU, JuegoBajo, JuegoMedio, JuegoAlto) :-
     juego(JuegoBajo, baja),
     juego(JuegoMedio, media),
     juego(JuegoAlto, alta).
+
+
+% =========================================================================
+% 4. SISTEMA DE RECOMENDACIÓN EXCLUSIVA (Solución Anti-Cuello de Botella)
+% =========================================================================
+
+% Encuentra componentes alternativos que eliminen el cuello de botella (< 15%)
+obtener_recomendaciones_exclusivas(CPU, GPU, Resolucion, TipoCambio, ListaRecomendados) :-
+    calcular_bottleneck(CPU, GPU, Resolucion, Porcentaje, _),
+    (Porcentaje > 0 ->
+        (ScoreCPU_Raw = ScoreCPU_Raw, cpu(CPU, _, _, _, ScoreCPU_Raw), gpu(GPU, _, _, ScoreGPU_Raw), Diferencia is ScoreCPU_Raw - ScoreGPU_Raw,
+            (Diferencia > 0 ->
+                % Cuello en GPU: Se necesita recomendar una GPU mejor
+                TipoCambio = 'GPU',
+                findall(NomGPU, (gpu(NomGPU, _, _, S), NomGPU \= GPU, calcular_bottleneck(CPU, NomGPU, Resolucion, 0, _)), ListaRecomendados)
+            ;
+                % Cuello en CPU: Se necesita recomendar un CPU mejor
+                TipoCambio = 'CPU',
+                findall(NomCPU, (cpu(NomCPU, _, _, _, S), NomCPU \= CPU, calcular_bottleneck(NomCPU, GPU, Resolucion, 0, _)), ListaRecomendados)
+            )
+        )
+    ;
+        TipoCambio = 'NINGUNO',
+        ListaRecomendados = []
+    ).
