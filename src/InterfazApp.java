@@ -28,12 +28,11 @@ public class InterfazApp extends JFrame {
     private final Color TEXTO_CYAN = new Color(74, 192, 224);
 
     public InterfazApp() {
-        // 1. Cargar archivo Prolog
+        // Cargar archivo Prolog
         if (!Query.hasSolution("consult('sistema.pl')")) {
             JOptionPane.showMessageDialog(this, "Error crítico: No se pudo cargar sistema.pl\nVerifique que el archivo esté en la raíz del proyecto.", "Error", JOptionPane.ERROR_MESSAGE);
         }
 
-        // 2. Configuración de la Ventana Principal
         setTitle("Sistema Experto - Analizador de Hardware");
         setSize(800, 750);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -46,7 +45,6 @@ public class InterfazApp extends JFrame {
         panelContenedor.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         setContentPane(panelContenedor);
 
-        // 3. Panel Superior: Selección
         JPanel panelInputs = new JPanel(new GridLayout(4, 2, 10, 15));
         panelInputs.setBackground(FONDO_PANELES);
         panelInputs.setBorder(crearBordePersonalizado(" Selección de Hardware "));
@@ -79,17 +77,14 @@ public class InterfazApp extends JFrame {
         
         panelContenedor.add(panelInputs, BorderLayout.NORTH);
 
-        // 4. Panel Central
         panelGrafico = new PanelGrafico();
         panelGrafico.setBackground(FONDO_PANELES);
         panelGrafico.setBorder(crearBordePersonalizado(" Carga Relativa de Trabajo (Simulación) "));
         panelContenedor.add(panelGrafico, BorderLayout.CENTER);
 
-        // 5. Panel Inferior
         JPanel panelResultados = new JPanel(new GridLayout(1, 2, 15, 15));
         panelResultados.setBackground(FONDO_PRINCIPAL);
 
-        // Sub-panel Izquierdo
         JPanel panelDiagnostico = new JPanel(new BorderLayout(5, 5));
         panelDiagnostico.setBackground(FONDO_PANELES);
         panelDiagnostico.setBorder(crearBordePersonalizado(" Diagnóstico del Sistema "));
@@ -103,7 +98,6 @@ public class InterfazApp extends JFrame {
         estilizarTextArea(txtDictamen);
         panelDiagnostico.add(new JScrollPane(txtDictamen), BorderLayout.CENTER);
 
-        // Sub-panel Derecho
         JPanel panelJuegosContenedor = new JPanel(new BorderLayout());
         panelJuegosContenedor.setBackground(FONDO_PANELES);
         panelJuegosContenedor.setBorder(crearBordePersonalizado(" Rendimiento Estimado en Juegos "));
@@ -119,7 +113,6 @@ public class InterfazApp extends JFrame {
         panelResultados.add(panelJuegosContenedor);
         panelContenedor.add(panelResultados, BorderLayout.SOUTH);
 
-        // 6. Lógica del Botón
         btnCalcular.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -220,7 +213,6 @@ public class InterfazApp extends JFrame {
             panelMedidor.actualizarPorcentaje(porcentaje);
             txtDictamen.setText(dictamen);
 
-            // 2. Extraer Scores
             int scoreCPU = 50; 
             int scoreGPU = 50;
             
@@ -234,7 +226,6 @@ public class InterfazApp extends JFrame {
                 scoreGPU = qScoreGPU.oneSolution().get("Score").intValue();
             }
 
-            // 3. NUEVO: Consultar Recomendaciones Exclusivas
             String recomendacionFinal = "";
             String consultaRecom = "obtener_recomendaciones_exclusivas(" + cpu + ", " + gpu + ", " + res + ", Tipo, Lista)";
             Query qRecom = new Query(consultaRecom);
@@ -244,14 +235,12 @@ public class InterfazApp extends JFrame {
                 String tipoCambio = resRecom.get("Tipo").toString().replace("'", "");
 
                 if (!tipoCambio.equals("NINGUNO")) {
-                    // Limpiar la lista devuelta por Prolog ej: "[rtx_3060, rtx_4060_ti]"
                     String listaCruda = resRecom.get("Lista").toString().replaceAll("[\\[\\]']", "");
                     
                     if (!listaCruda.trim().isEmpty()) {
                         String[] componentes = listaCruda.split(",");
                         StringBuilder textoRec = new StringBuilder("💡 Recomendación: Mejorar " + tipoCambio + " a -> ");
                         
-                        // Mostrar hasta un máximo de 3 sugerencias para que no se sature la interfaz
                         int limite = Math.min(componentes.length, 3);
                         for (int i = 0; i < limite; i++) {
                             textoRec.append(componentes[i].trim().toUpperCase().replace("_", " "));
@@ -266,10 +255,8 @@ public class InterfazApp extends JFrame {
                 }
             }
 
-            // Actualizar el gráfico pasando la recomendación
             panelGrafico.actualizarGrafico(scoreCPU, scoreGPU, recomendacionFinal);
 
-            // 4. Mostrar Gama y Juegos
             Query qGama = new Query("gama_gpu(" + gpu + ", Gama)");
             if (qGama.hasSolution()) {
                 String gama = qGama.oneSolution().get("Gama").toString().replace("'", "");
@@ -360,9 +347,8 @@ class PanelMedidor extends JPanel {
 class PanelGrafico extends JPanel {
     private int rendimientoCPU = 50;
     private int rendimientoGPU = 50;
-    private String recomendacion = ""; // NUEVO ATRIBUTO
+    private String recomendacion = "";
 
-    // ACTUALIZACIÓN DE FIRMA DEL MÉTODO
     public void actualizarGrafico(int cpu, int gpu, String recomendacion) {
         this.rendimientoCPU = cpu;
         this.rendimientoGPU = gpu;
@@ -418,9 +404,8 @@ class PanelGrafico extends JPanel {
             g2.drawString("Equilibrio óptimo: Ambos componentes están sincronizados de manera eficiente.", 20, 135);
         }
 
-        // NUEVO: Dibujar la recomendación dinámica si existe
         if (recomendacion != null && !recomendacion.isEmpty()) {
-            g2.setColor(new Color(255, 215, 0)); // Color Dorado/Amarillento para destacar la sugerencia
+            g2.setColor(new Color(255, 215, 0));
             g2.setFont(new Font("Segoe UI", Font.BOLD, 13));
             g2.drawString(recomendacion, 20, 165);
         }
