@@ -159,7 +159,6 @@ public class InterfazApp extends JFrame {
         area.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
     }
 
-    // Función que recibe "counter_strike_2" y devuelve "Counter Strike 2"
     private String formatearNombreJuego(String idJuego) {
         String[] palabras = idJuego.split("_");
         StringBuilder nombreFormateado = new StringBuilder();
@@ -173,19 +172,16 @@ public class InterfazApp extends JFrame {
         return nombreFormateado.toString().trim();
     }
 
-    // Crea un mini-panel con el texto y luego el logo del juego
     private JPanel crearFilaJuego(String nivelSpecs, String idJuego) {
         JPanel panelFila = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
         panelFila.setBackground(FONDO_PANELES);
         panelFila.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // 1. Configurar el texto PRIMERO (SIN símbolos conflictivos)
         String nombreBonito = formatearNombreJuego(idJuego);
         JLabel lblTexto = new JLabel("Specs " + nivelSpecs + ": " + nombreBonito);
         lblTexto.setForeground(TEXTO_CLARO);
         lblTexto.setFont(new Font("Segoe UI", Font.PLAIN, 13));
 
-        // 2. Configurar la imagen SEGUNDO (Leyendo directo con el nombre de Prolog)
         String rutaImagen = "assets/juegos/" + idJuego + ".png";
         JLabel lblIcono = new JLabel();
         
@@ -195,13 +191,11 @@ public class InterfazApp extends JFrame {
             Image imgEscalada = iconoOriginal.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
             lblIcono.setIcon(new ImageIcon(imgEscalada));
         } else {
-            // Reemplazo limpio en caso de no encontrar la imagen
             lblIcono.setText("[Sin imagen]");
-            lblIcono.setForeground(new Color(150, 150, 150)); // Gris oscuro
+            lblIcono.setForeground(new Color(150, 150, 150)); 
             lblIcono.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         }
 
-        // Se añaden al panel en el orden solicitado (Texto -> Imagen)
         panelFila.add(lblTexto);
         panelFila.add(lblIcono);
         
@@ -214,6 +208,7 @@ public class InterfazApp extends JFrame {
         String gpu = comboGPU.getSelectedItem().toString();
         String res = "'" + comboRes.getSelectedItem().toString() + "'";
 
+        // 1. Calcular Cuello de Botella General
         String consultaTexto = "calcular_bottleneck(" + cpu + ", " + gpu + ", " + res + ", Porcentaje, Mensaje)";
         Query q = new Query(consultaTexto);
 
@@ -225,6 +220,7 @@ public class InterfazApp extends JFrame {
             panelMedidor.actualizarPorcentaje(porcentaje);
             txtDictamen.setText(dictamen);
 
+            // 2. Extraer Scores
             int scoreCPU = 50; 
             int scoreGPU = 50;
             
@@ -238,8 +234,42 @@ public class InterfazApp extends JFrame {
                 scoreGPU = qScoreGPU.oneSolution().get("Score").intValue();
             }
 
-            panelGrafico.actualizarGrafico(scoreCPU, scoreGPU);
+            // 3. NUEVO: Consultar Recomendaciones Exclusivas
+            String recomendacionFinal = "";
+            String consultaRecom = "obtener_recomendaciones_exclusivas(" + cpu + ", " + gpu + ", " + res + ", Tipo, Lista)";
+            Query qRecom = new Query(consultaRecom);
 
+            if (qRecom.hasSolution()) {
+                Map<String, Term> resRecom = qRecom.oneSolution();
+                String tipoCambio = resRecom.get("Tipo").toString().replace("'", "");
+
+                if (!tipoCambio.equals("NINGUNO")) {
+                    // Limpiar la lista devuelta por Prolog ej: "[rtx_3060, rtx_4060_ti]"
+                    String listaCruda = resRecom.get("Lista").toString().replaceAll("[\\[\\]']", "");
+                    
+                    if (!listaCruda.trim().isEmpty()) {
+                        String[] componentes = listaCruda.split(",");
+                        StringBuilder textoRec = new StringBuilder("💡 Recomendación: Mejorar " + tipoCambio + " a -> ");
+                        
+                        // Mostrar hasta un máximo de 3 sugerencias para que no se sature la interfaz
+                        int limite = Math.min(componentes.length, 3);
+                        for (int i = 0; i < limite; i++) {
+                            textoRec.append(componentes[i].trim().toUpperCase().replace("_", " "));
+                            if (i < limite - 1) textoRec.append(" | ");
+                        }
+                        if (componentes.length > 3) textoRec.append(" (entre otras)");
+                        
+                        recomendacionFinal = textoRec.toString();
+                    } else {
+                        recomendacionFinal = "💡 Recomendación: Considerar actualizar " + tipoCambio + " (No hay opciones superiores en BD).";
+                    }
+                }
+            }
+
+            // Actualizar el gráfico pasando la recomendación
+            panelGrafico.actualizarGrafico(scoreCPU, scoreGPU, recomendacionFinal);
+
+            // 4. Mostrar Gama y Juegos
             Query qGama = new Query("gama_gpu(" + gpu + ", Gama)");
             if (qGama.hasSolution()) {
                 String gama = qGama.oneSolution().get("Gama").toString().replace("'", "");
@@ -251,10 +281,8 @@ public class InterfazApp extends JFrame {
                     String idMedio = resJuegos.get("JMedio").toString();
                     String idAlto = resJuegos.get("JAlto").toString();
 
-                    // --- ACTUALIZAR EL PANEL DE JUEGOS ---
                     panelListaJuegos.removeAll(); 
                     
-                    // Solo texto limpio, en mayúsculas, sin viñetas ni emojis
                     JLabel lblGama = new JLabel("GAMA DETECTADA: " + gama.toUpperCase());
                     lblGama.setForeground(TEXTO_CYAN);
                     lblGama.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -332,10 +360,13 @@ class PanelMedidor extends JPanel {
 class PanelGrafico extends JPanel {
     private int rendimientoCPU = 50;
     private int rendimientoGPU = 50;
+    private String recomendacion = ""; // NUEVO ATRIBUTO
 
-    public void actualizarGrafico(int cpu, int gpu) {
+    // ACTUALIZACIÓN DE FIRMA DEL MÉTODO
+    public void actualizarGrafico(int cpu, int gpu, String recomendacion) {
         this.rendimientoCPU = cpu;
         this.rendimientoGPU = gpu;
+        this.recomendacion = recomendacion;
         repaint(); 
     }
 
@@ -375,7 +406,6 @@ class PanelGrafico extends JPanel {
         g2.setColor(Color.WHITE);
         g2.drawString(rendimientoGPU + "%", inicioX + anchoMaximo + 15, 95);
 
-        // Sin cuadritos tampoco en la zona del gráfico
         g2.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         if (rendimientoCPU > (rendimientoGPU + 15)) {
             g2.setColor(new Color(220, 100, 100));
@@ -386,6 +416,13 @@ class PanelGrafico extends JPanel {
         } else {
             g2.setColor(new Color(80, 200, 120));
             g2.drawString("Equilibrio óptimo: Ambos componentes están sincronizados de manera eficiente.", 20, 135);
+        }
+
+        // NUEVO: Dibujar la recomendación dinámica si existe
+        if (recomendacion != null && !recomendacion.isEmpty()) {
+            g2.setColor(new Color(255, 215, 0)); // Color Dorado/Amarillento para destacar la sugerencia
+            g2.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            g2.drawString(recomendacion, 20, 165);
         }
     }
 }
